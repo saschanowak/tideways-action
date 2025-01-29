@@ -1,0 +1,58 @@
+name: Update
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/**'
+  schedule:
+    - cron: "0 11 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    name: Update Versions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          cache: false
+
+      - name: Run update.sh.
+        run: ./update.sh
+
+      - name: Commit changes.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -x
+          
+          go install github.com/planetscale/ghcommit@latest
+          
+          if ! git diff --quiet cli/Dockerfile; then
+            ghcommit -r ${{ github.repository }} \
+              -b main \
+              --add cli/Dockerfile \
+              --message "Update to tideways-cli $(awk '
+              $1 == "ENV" { env=1 }
+              env {
+                for (i=1; i <= NF; i++) {
+                  split($i, a, "=");
+                  if (a[1] == "TIDEWAYS_CLI_VERSION") {
+                    print a[2]
+                    exit
+                  }
+                }
+              }
+              env && !/\\$/ { env=0 }
+            ' cli/Dockerfile)"
+            git pull --autostash
+          fi
