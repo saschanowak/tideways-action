@@ -1,0 +1,68 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  schedule:
+    - cron: '0 12 * * *'
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+  attestations: write
+
+jobs:
+  build-docker-image:
+    name: Debian
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/checkout@v4
+
+      - name: Extract version from Dockerfile
+        id: extract_version
+        working-directory: ./cli/
+        run: |
+          echo "version=$(awk '
+            $1 == "ENV" { env=1 }
+            env {
+              for (i=1; i <= NF; i++) {
+                split($i, a, "=");
+                if (a[1] == "TIDEWAYS_CLI_VERSION") {
+                  print a[2]
+                  exit
+                }
+              }
+            }
+            env && !/\\$/ { env=0 }
+          ' Dockerfile)" >> $GITHUB_OUTPUT
+
+      - uses: docker/build-push-action@v6
+        id: build
+        with:
+          context: ./tideways-cli/
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ghcr.io/saschanowak/tideways-cli:latest,ghcr.io/saschanowak/tideways-cli:${{ steps.extract_version.outputs.version }}
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha,scope=tideways-cli
+          cache-to: type=gha,scope=tideways-cli,mode=max
+
+      - uses: actions/attest-build-provenance@v2
+        if: ${{ github.event_name != 'pull_request' }}
+        id: attest
+        with:
+          subject-name: ghcr.io/saschanowak/tideways-cli
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true

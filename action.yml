@@ -1,0 +1,45 @@
+name: 'Tideways release'
+author: 'Sascha Nowak'
+description: 'GitHub Action that add release events to tideways'
+branding:
+  icon: server
+  color: orange
+inputs:
+  apiKey:
+    description: 'Check to "Project Settings" to find the API key necessary to authenticate the Create Event request.'
+    required: true
+  appName:
+    description: 'Name of the project'
+    required: true
+  title:
+    description: 'Name of the release'
+    required: true
+  eventType:
+    description: 'Type of the event'
+    default: 'release'
+    options:
+      - release
+      - marker
+  description:
+    description: 'More details about the release if you want.'
+  environment:
+    description: 'The environment this release is performed on, otherwise the default environment is used.'
+    default: 'production'
+  service:
+    description: 'The service this release is performed on, otherwise the default service of the project is used.'
+  compareAfterMinutes:
+    description: 'Specifies the timeframes around the event for which the performance will be compared. Supported values are between 5 minutes and 1440 minutes (one day).'
+    default: 90
+
+runs:
+  using: 'docker'
+  image: 'docker://ghcr.io/saschanowak/tideways-cli:latest'
+  env:
+    TIDEWAYS_API_KEY: ${{ inputs.apiKey }}
+    TIDEWAYS_APP_NAME: ${{ inputs.appName }}
+    TIDEWAYS_TITLE: ${{ inputs.title }}
+    TIDEWAYS_EVENT_TYPE: ${{ inputs.eventType }}
+    TIDEWAYS_DESCRIPTION:  ${{ inputs.description }}
+    TIDEWAYS_ENVIRONMENT:  ${{ inputs.environment }}
+    TIDEWAYS_SERVICE: ${{ inputs.service }}
+    TIDEWAYS_COMPARE_AFTER_MINUTES:  ${{ inputs.compareAfterMinutes }}
